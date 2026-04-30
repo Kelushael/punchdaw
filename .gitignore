@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+.npm
+
+# Build outputs
+dist/
+out/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Runtime
+clips/
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Environment
+.env
+.env.local
+
+# Electron
+*.asar
+
+# macOS
+*.app
+*.dmg
+*.pkg
+*.zip
+
+# Testing
+coverage/
+
+# Misc
+.tmp/
+temp/

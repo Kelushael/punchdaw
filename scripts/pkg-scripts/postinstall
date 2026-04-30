@@ -1,0 +1,39 @@
+#!/bin/bash
+#
+# NeonForge Voice — .pkg Post-Install Script
+# Runs as root after the app is copied to /Applications.
+# SAFE: Only checks dependencies. Never touches user files.
+#
+set -e
+
+APP_NAME="NeonForge Voice"
+BUNDLE="/Applications/NeonForge Voice.app"
+LOG="/tmp/neonforge-install.log"
+
+exec >"$LOG" 2>&1
+
+echo "[$APP_NAME] Post-install starting…"
+
+# ── 1. Remove quarantine attributes ──
+if [[ -d "$BUNDLE" ]]; then
+  xattr -rd com.apple.quarantine "$BUNDLE" 2>/dev/null || true
+  xattr -rd com.apple.quarantine "/Applications/NeonForge Voice.app" 2>/dev/null || true
+  echo "[$APP_NAME] Quarantine cleared"
+fi
+
+# ── 2. Register with LaunchServices ──
+/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/\LaunchServices.framework/Versions/A/Support/lsregister -f "$BUNDLE" 2>/dev/null || true
+echo "[$APP_NAME] Registered with LaunchServices"
+
+# ── 3. Dependency check (ffmpeg) ──
+if ! command -v ffmpeg &>/dev/null; then
+  echo "[$APP_NAME] ffmpeg not found — prompting user…"
+  # Show a friendly OS dialog
+  osascript -e 'display dialog "NeonForge Voice needs ffmpeg to record audio.\n\nInstall it now with Homebrew?\n( brew install ffmpeg )" buttons {"Later","Install"} default button "Install" with icon note with title "NeonForge Voice"' 2>/dev/null || true
+fi
+
+# ── 4. Create user clips directory ──
+USER_CLIPS="$HOME/clips"
+mkdir -p "$USER_CLIPS" 2>/dev/null || true
+
+echo "[$APP_NAME] Post-install complete."

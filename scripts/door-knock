@@ -1,0 +1,181 @@
+#!/usr/bin/env bash
+#
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║  DOOR KNOCK  —  Send a knock. They see a GUI. They click yes/no.   ║
+# ╚══════════════════════════════════════════════════════════════════════╝
+#
+#  ZERO TERMINAL for the recipient. They double-click an app once.
+#  From then on, knocks appear as native macOS dialogs.
+#
+#  RECIPIENT SETUP (one time):
+#    1. Copy DoorKnockListener.app to their Mac
+#    2. Double-click it
+#    3. Done — it runs invisibly in the background
+#
+#  SENDER USAGE:
+#    door-knock <target> "Your message here"
+#
+#    # Via SSH (writes directly to their ~/DoorKnocks)
+#    door-knock macdonalejandro@vms-mac-3 "Can I jump on the mic?"
+#
+#    # Via shared folder (Dropbox, iCloud, etc.)
+#    door-knock --folder ~/Dropbox/DoorKnocks "Ready when you are"
+#
+set -euo pipefail
+
+ME="$(whoami)@$(hostname -s 2>/dev/null || hostname)"
+
+# ── Colors ──
+GRN='\033[0;32m' RED='\033[0;31m' CYAN='\033[0;36m'
+YEL='\033[1;33m' MAG='\033[0;35m' NC='\033[0m' BOLD='\033[1m'
+
+usage() {
+  cat <<EOF
+Usage:
+  door-knock <user@host>    "message"      # SSH mode
+  door-knock --folder <path> "message"      # Shared-folder mode
+  door-knock --local         "message"      # Same machine
+
+Examples:
+  door-knock macdonalejandro@vms-mac-3 "Can I record?"
+  door-knock --folder ~/Dropbox/Shared/Knocks "5 min on the mic"
+  door-knock --local "Testing — tap Accept if you see this"
+
+Recipient setup:
+  1. Copy scripts/DoorKnockListener.app to their Mac
+  2. They double-click it (no terminal, no password)
+  3. It runs silently. Knocks pop up as dialogs.
+EOF
+  exit 1
+}
+
+[[ $# -lt 2 ]] && usage
+
+MODE="ssh"
+TARGET=""
+MSG=""
+KNOCK_DIR=""
+
+# Parse args
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --folder|-f)
+      MODE="folder"
+      KNOCK_DIR="$2"
+      shift 2
+      ;;
+    --local|-l)
+      MODE="local"
+      KNOCK_DIR="$HOME/DoorKnocks"
+      shift
+      ;;
+    -*)
+      usage
+      ;;
+    *)
+      if [[ -z "$TARGET" && "$MODE" == "ssh" ]]; then
+        TARGET="$1"
+      elif [[ -z "$MSG" ]]; then
+        MSG="$1"
+      fi
+      shift
+      ;;
+  esac
+done
+
+[[ -z "$MSG" ]] && usage
+
+# ── Generate knock ID ──
+ID="knock-$(date +%s)-$$"
+KNOCK_FILE="$ID.json"
+RESPONSE_FILE="${ID}-response.json"
+
+# ── Build knock payload ──
+PAYLOAD="{\"from\":\"$ME\",\"message\":\"$MSG\",\"sent_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}"
+
+# ── MODE: Shared folder ──
+if [[ "$MODE" == "folder" || "$MODE" == "local" ]]; then
+  [[ -z "$KNOCK_DIR" ]] && die "No folder specified. Use --folder <path>"
+  mkdir -p "$KNOCK_DIR"
+  
+  echo "$PAYLOAD" > "$KNOCK_DIR/$KNOCK_FILE"
+  ok()  { printf "${GRN}✓${NC} %s\n" "$*"; }
+  log() { printf "${CYAN}▸${NC} %s\n" "$*"; }
+  err() { printf "${RED}✗${NC} %s\n" "$*" >&2; }
+  
+  log "Knock written to $KNOCK_DIR/$KNOCK_FILE"
+  log "Waiting for response… (they see a dialog right now)"
+  
+  # Poll for response
+  SECONDS_WAITED=0
+  while [[ ! -f "$KNOCK_DIR/$RESPONSE_FILE" ]]; do
+    sleep 1
+    SECONDS_WAITED=$((SECONDS_WAITED + 1))
+    if [[ $SECONDS_WAITED -ge 300 ]]; then
+      err "Timed out after 5 minutes. No response."
+      rm -f "$KNOCK_DIR/$KNOCK_FILE"
+      exit 1
+    fi
+  done
+  
+  RESPONSE=$(grep '"response"' "$KNOCK_DIR/$RESPONSE_FILE" 2>/dev/null | sed 's/.*"response": *"\([^"]*\)".*/\1/' || echo "DENIED")
+  
+  if [[ "$RESPONSE" == "ACCEPT"* ]]; then
+    ok "ACCEPTED — you're cleared to proceed"
+    exit 0
+  else
+    err "DENIED — they said no"
+    exit 1
+  fi
+fi
+
+# ── MODE: SSH ──
+[[ -z "$TARGET" ]] && usage
+
+log() { printf "${CYAN}▸${NC} %s\n" "$*"; }
+ok()  { printf "${GRN}✓${NC} %s\n" "$*"; }
+err() { printf "${RED}✗${NC} %s\n" "$*" >&2; }
+die() { err "$*"; exit 1; }
+
+log "Checking SSH to $TARGET…"
+if ! ssh -o ConnectTimeout=5 -o BatchMode=yes "$TARGET" "echo ok" &>/dev/null; then
+  die "Cannot SSH to $TARGET.\nMake sure SSH keys are set up:\n  ssh-copy-id $TARGET"
+fi
+
+# Write knock file via SSH
+ssh "$TARGET" "mkdir -p ~/DoorKnocks && cat > ~/DoorKnocks/$KNOCK_FILE" <<< "$PAYLOAD"
+log "Knock sent. They see a dialog on their screen right now."
+log "Waiting for response…"
+
+# Poll for response via SSH
+SECONDS_WAITED=0
+while true; do
+  if ssh -o ConnectTimeout=3 "$TARGET" "test -f ~/DoorKnocks/$RESPONSE_FILE" 2>/dev/null; then
+    RESPONSE=$(ssh -o ConnectTimeout=3 "$TARGET" "cat ~/DoorKnocks/$RESPONSE_FILE" 2>/dev/null | grep '"response"' | sed 's/.*"response": *"\([^"]*\)".*/\1/' || echo "DENIED")
+    
+    # Clean up remote files
+    ssh -o ConnectTimeout=3 "$TARGET" "rm -f ~/DoorKnocks/$KNOCK_FILE ~/DoorKnocks/$RESPONSE_FILE" 2>/dev/null || true
+    
+    if [[ "$RESPONSE" == "ACCEPT"* ]]; then
+      echo ""
+      echo "${GRN}╔══════════════════════════════════════════════════════════════╗${NC}"
+      echo "${GRN}║${NC}  🎉  ACCEPTED  —  $TARGET said YES                         ${GRN}║${NC}"
+      echo "${GRN}╚══════════════════════════════════════════════════════════════╝${NC}"
+      exit 0
+    else
+      echo ""
+      echo "${RED}╔══════════════════════════════════════════════════════════════╗${NC}"
+      echo "${RED}║${NC}  ❌  DENIED  —  $TARGET said NO                            ${RED}║${NC}"
+      echo "${RED}╚══════════════════════════════════════════════════════════════╝${NC}"
+      exit 1
+    fi
+  fi
+  
+  sleep 1
+  SECONDS_WAITED=$((SECONDS_WAITED + 1))
+  if [[ $SECONDS_WAITED -ge 300 ]]; then
+    err "Timed out after 5 minutes. No response."
+    ssh -o ConnectTimeout=3 "$TARGET" "rm -f ~/DoorKnocks/$KNOCK_FILE" 2>/dev/null || true
+    exit 1
+  fi
+done

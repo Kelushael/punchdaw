@@ -1,0 +1,136 @@
+{
+  "name": "neonslab-voiceforge",
+  "version": "2.0.0",
+  "description": "NeonForge Voice — God-Mode Audio Production Agent",
+  "main": "electron/main.js",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "electron": "electron .",
+    "start": "npm run build && npm run electron",
+    "dist": "npm run build && electron-builder",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "dist:win": "npm run build && electron-builder --win",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "lucide-react": "^0.441.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "wavesurfer.js": "^7.8.0",
+    "xterm": "^5.3.0",
+    "@xterm/addon-fit": "^0.11.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "electron": "^41.3.0",
+    "electron-builder": "^26.0.12",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.3",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.11"
+  },
+  "build": {
+    "appId": "io.neonslab.voiceforge",
+    "productName": "NeonForge Voice",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "backend/**/*",
+      "clips/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "backend",
+        "to": "backend"
+      },
+      {
+        "from": "bin/${platform}",
+        "to": "bin/${platform}",
+        "filter": ["**/*"]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.music",
+      "target": [
+        {
+          "target": "pkg",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "build/icons/icon.icns",
+      "minimumSystemVersion": "10.15",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "entitlements": null,
+      "entitlementsInherit": null,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "NeonForge Voice needs microphone access to record vocals.",
+        "NSRequiresAquaSystemAppearance": false
+      }
+    },
+    "pkg": {
+      "installLocation": "/Applications",
+      "allowAnywhere": true,
+      "allowCurrentUserHome": false,
+      "allowRootDirectory": false,
+      "license": "build/license.txt",
+      "scripts": "build/pkg-scripts"
+    },
+    "dmg": {
+      "title": "NeonForge Voice ${version}",
+      "icon": "build/icons/icon.icns",
+      "background": "build/background/dmg-bg.png",
+      "window": {
+        "width": 660,
+        "height": 440
+      },
+      "contents": [
+        {
+          "x": 180,
+          "y": 170,
+          "type": "file"
+        },
+        {
+          "x": 480,
+          "y": 170,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        }
+      ],
+      "category": "AudioVideo",
+      "icon": "build/icons"
+    }
+  }
+}
