@@ -1,0 +1,7 @@
+build/
+*.mp3
+*.json
+.DS_Store
+*.o
+*.exe
+*.app
