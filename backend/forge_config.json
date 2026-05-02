@@ -1,0 +1,40 @@
+{
+  "profile": "neonforge-local-sovereign",
+  "version": "2.2.0",
+  "gpu": {
+    "host": "108.181.162.206",
+    "role": "heavy audio inference and Whisper-class workloads",
+    "whisper_status": "ready",
+    "preferred_transcription_runner": "gpu_whisper",
+    "health_urls": [
+      "http://108.181.162.206:8000/health",
+      "http://108.181.162.206:8000/v1/health"
+    ]
+  },
+  "gateway": {
+    "host": "185.28.23.43",
+    "openai_compatible_base_url": "http://185.28.23.43:8787/v1",
+    "api_key_env": "NEONFORGE_API_KEY",
+    "default_api_key": "ollama",
+    "default_model": "qwen2.5:7b"
+  },
+  "browser_app_container": {
+    "html_root_id": "root",
+    "html_selector": "#root[data-neonforge-container='app']",
+    "entrypoint": "src/main.tsx",
+    "app_shell": "src/App.tsx",
+    "electron_window_title": "NeonForge Voice",
+    "rule": "Every browser/electron build must have a discoverable app container before React renders."
+  },
+  "state_bridge": {
+    "path": "~/.neonslab-voiceforge/app_state.json",
+    "renderer_channel": "app-state:update",
+    "purpose": "Keep the left-side agent grounded in the actual visible workstation state."
+  },
+  "paths": {
+    "workspace": ".",
+    "clips": "clips",
+    "backend": "backend",
+    "exports": "~/.neonslab-voiceforge/archive"
+  }
+}
